@@ -1,0 +1,61 @@
+# Configuration for the LLM Finetuning Project
+
+# --- Model ---
+base_model_name: "microsoft/phi-2"
+
+# --- Data Setup & Filtering ---
+# Source CSV file name (expected within ./data/)
+source_csv_filename: "GlobalLandTemperaturesByCity.csv"
+# Use dummy data if source_csv_filename not found?
+create_dummy_if_missing: True
+# Countries and years for initial filtering
+filter_countries:
+  - 'Germany'
+  - 'Japan'
+  - 'France'
+  - 'United Kingdom'
+  - 'USA'
+  - 'Egypt'
+  - 'Australia'
+  - 'Russia'
+  - 'China'
+  - 'Italy'
+  - 'Spain'
+filter_year_start: 1950
+filter_year_end: 2013
+
+# --- Training Data Generation ---
+num_training_examples: 2000 # Reduced for quicker testing
+
+# --- Fine-tuning Parameters (QLoRA + SFTTrainer) ---
+trainer:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-4
+  num_train_epochs: 3 # Reduced for quicker testing
+  logging_steps: 10
+  save_strategy: "epoch" # Consider 'no' if you only want the final adapter
+  fp16: True
+  max_grad_norm: 0.3
+  warmup_ratio: 0.1
+  lr_scheduler_type: "cosine"
+  save_total_limit: 1
+
+lora:
+  r: 16
+  lora_alpha: 32
+  target_modules: ["Wqkv", "out_proj", "fc1", "fc2"] # Adjust if needed
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+bnb:
+  load_in_4bit: True
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "torch.bfloat16" # Use string representation here
+  bnb_4bit_use_double_quant: True
+
+# --- Inference ---
+inference:
+  max_new_tokens: 200
+  do_sample: False

@@ -78,7 +78,8 @@ Thumbs.db
 
 models/*
 results/*
-data/
+
+data/*
 # If you want Git to track the *empty* folders (data, models, results) so they
 # are created when someone clones the repo, create an empty file named `.gitkeep`
 # inside each of these folders and uncomment the lines below:

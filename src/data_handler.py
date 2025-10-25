@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 # --- Initial Data Loading and Filtering ---
 
 def create_dummy_data(output_path: str):
-    """Creates a small dummy CSV file."""
+    """Creates a small dummy CSV file.
+
+    Args:
+        output_path: The path to save the dummy CSV file.
+    """
     try:
         logger.info(f"Creating dummy data at {output_path}...")
         dummy_data = {
@@ -30,10 +34,18 @@ def create_dummy_data(output_path: str):
         return False
 
 def prepare_filtered_data(config: dict) -> Optional[str]:
-    """
-    Loads source CSV, filters it based on config, saves the result,
-    and returns the path to the filtered file or None on failure.
-    Uses dummy data if source is missing and config allows.
+    """Loads and filters the source climate data.
+
+    This function loads the source CSV file, filters it based on the
+    countries and year range specified in the configuration, and saves
+    the result to a new CSV file. If the source file is missing, it
+    can create a dummy file for testing purposes.
+
+    Args:
+        config: The project configuration dictionary.
+
+    Returns:
+        The path to the filtered data file, or None if an error occurs.
     """
     source_csv_path = config['paths']['source_csv_path']
     output_csv_path = config['paths']['processed_data_path']
@@ -98,7 +110,23 @@ def prepare_filtered_data(config: dict) -> Optional[str]:
 # --- Training Data Generation ---
 
 def generate_training_data(num_examples: int, countries_list: List[str], year_start: int, year_end: int) -> Optional[pd.DataFrame]:
-    """Generates synthetic training data (Instruction -> JSON)."""
+    """Generates synthetic training data.
+
+    This function creates a DataFrame of instruction-response pairs
+    for fine-tuning the language model. The instructions are natural
+    language queries for climate data plots, and the responses are
+    JSON objects that specify the plot type and parameters.
+
+    Args:
+        num_examples: The number of training examples to generate.
+        countries_list: A list of countries to use for generating data.
+        year_start: The minimum year for the date range.
+        year_end: The maximum year for the date range.
+
+    Returns:
+        A pandas DataFrame with "instruction" and "output" columns,
+        or None if an error occurs.
+    """
     logger.info(f"Generating {num_examples} function call training samples...")
 
     city_country_pairs = {
@@ -200,7 +228,18 @@ def generate_training_data(num_examples: int, countries_list: List[str], year_st
 _loaded_data: Optional[pd.DataFrame] = None
 
 def load_processed_data_for_inference(processed_data_path: str) -> bool:
-    """Loads the filtered data into memory for inference use."""
+    """Loads the processed data for inference.
+
+    This function loads the filtered climate data from the specified
+    CSV file into a global DataFrame, making it available for the
+    inference functions.
+
+    Args:
+        processed_data_path: The path to the processed data CSV file.
+
+    Returns:
+        True if the data is loaded successfully, False otherwise.
+    """
     global _loaded_data
     if _loaded_data is not None:
         return True # Already loaded
@@ -224,7 +263,22 @@ def load_processed_data_for_inference(processed_data_path: str) -> bool:
         return False
 
 def get_yearly_avg_temps(city: str, country: str, start_year: int, end_year: int) -> Optional[pd.Series]:
-    """Filters in-memory data and calculates yearly averages."""
+    """Calculates the yearly average temperatures for a city.
+
+    This function filters the in-memory DataFrame of climate data
+    for a specific city and date range, and then calculates the
+    average temperature for each year.
+
+    Args:
+        city: The name of the city.
+        country: The name of the country.
+        start_year: The first year of the date range.
+        end_year: The last year of the date range.
+
+    Returns:
+        A pandas Series with the yearly average temperatures, or
+        None if no data is found.
+    """
     if _loaded_data is None:
         logger.error("Processed data not loaded. Cannot get yearly averages.")
         return None

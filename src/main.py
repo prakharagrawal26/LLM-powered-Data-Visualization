@@ -26,6 +26,7 @@ from .training import train_model
 
 # --- Basic Logging Setup ---
 def setup_logging():
+    """Configures the logging for the application."""
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     # Ensure data dir exists for log file
     os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -49,6 +50,7 @@ def setup_logging():
 
 # --- Main Execution Logic ---
 def run():
+    """Executes the main fine-tuning and inference pipeline."""
     # Setup logging first
     setup_logging()
     logger = logging.getLogger(__name__) # Get logger after setup

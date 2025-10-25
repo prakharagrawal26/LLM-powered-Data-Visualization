@@ -30,7 +30,16 @@ logger = logging.getLogger(__name__)
 # --- Model/Tokenizer Loading ---
 
 def load_base_model_and_tokenizer(model_name: str, bnb_config: BitsAndBytesConfig) -> Tuple[Optional[AutoModelForCausalLM], Optional[AutoTokenizer]]:
-    """Loads the base model and tokenizer."""
+    """Loads the base model and tokenizer.
+
+    Args:
+        model_name: The name of the model to load.
+        bnb_config: The BitsAndBytesConfig for quantization.
+
+    Returns:
+        A tuple containing the loaded model and tokenizer, or (None, None)
+        if an error occurs.
+    """
     try:
         logger.info(f"Loading base model: {model_name} with BitsAndBytes config...")
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -56,7 +65,21 @@ def load_base_model_and_tokenizer(model_name: str, bnb_config: BitsAndBytesConfi
         return None, None
 
 def load_finetuned_model_for_inference(base_model_name: str, adapter_path: str, bnb_config: BitsAndBytesConfig) -> Tuple[Optional[AutoModelForCausalLM], Optional[AutoTokenizer]]:
-    """Loads the base model, applies the adapter, merges it, and loads the tokenizer."""
+    """Loads a fine-tuned model for inference.
+
+    This function loads the base model, applies the LoRA adapter,
+    merges the adapter weights into the base model, and then loads
+    the tokenizer.
+
+    Args:
+        base_model_name: The name of the base model.
+        adapter_path: The path to the fine-tuned adapter.
+        bnb_config: The BitsAndBytesConfig for quantization.
+
+    Returns:
+        A tuple containing the loaded model and tokenizer, or (None, None)
+        if an error occurs.
+    """
     if not os.path.exists(adapter_path):
         logger.error(f"Adapter path not found: {adapter_path}")
         return None, None
@@ -100,7 +123,15 @@ def load_finetuned_model_for_inference(base_model_name: str, adapter_path: str, 
 # --- Training Setup ---
 
 def get_bitsandbytes_config(config: Dict[str, Any]) -> Optional[BitsAndBytesConfig]:
-    """Creates BitsAndBytesConfig from config."""
+    """Creates a BitsAndBytesConfig object from the project configuration.
+
+    Args:
+        config: The project configuration dictionary.
+
+    Returns:
+        A BitsAndBytesConfig object, or None if the configuration
+        is invalid.
+    """
     try:
         bnb_params = config['bnb']
         compute_dtype = bnb_params.get('bnb_4bit_compute_dtype', torch.bfloat16) # Default if needed
@@ -124,7 +155,14 @@ def get_bitsandbytes_config(config: Dict[str, Any]) -> Optional[BitsAndBytesConf
         return None
 
 def get_lora_config(config: Dict[str, Any]) -> Optional[LoraConfig]:
-    """Creates LoraConfig from config."""
+    """Creates a LoraConfig object from the project configuration.
+
+    Args:
+        config: The project configuration dictionary.
+
+    Returns:
+        A LoraConfig object, or None if the configuration is invalid.
+    """
     try:
         lora_params = config['lora']
         return LoraConfig(
@@ -143,7 +181,14 @@ def get_lora_config(config: Dict[str, Any]) -> Optional[LoraConfig]:
         return None
 
 def get_training_args(config: Dict[str, Any]) -> Optional[TrainingArguments]:
-    """Creates TrainingArguments from config."""
+    """Creates a TrainingArguments object from the project configuration.
+
+    Args:
+        config: The project configuration dictionary.
+
+    Returns:
+        A TrainingArguments object, or None if the configuration is invalid.
+    """
     try:
         trainer_params = config['trainer']
         output_dir = config['paths']['adapter_output_dir'] # Use the correct path
@@ -174,45 +219,90 @@ def get_training_args(config: Dict[str, Any]) -> Optional[TrainingArguments]:
         return None
 
 # --- Formatting Function for SFTTrainer ---
-
 def get_system_prompt() -> str:
-    """Builds the system prompt using the tool registry."""
+    """Builds the system prompt.
+
+    This function creates the system prompt that is used for both
+    fine-tuning and inference. The prompt includes the descriptions
+    of the available tools, so the model knows what functions it
+    can call.
+
+    Returns:
+        The system prompt string.
+    """
     tool_descs_json = tool_registry.get_tool_descriptions_json()
-    tool_names = tool_registry.get_tool_names()
-    return f"""You are an expert climate data visualization assistant. Analyze the user request and respond ONLY with a single valid JSON object specifying the plotting tool and parameters.
+    return f"""You are a helpful assistant with access to the following tools. Use them if required to answer the user's query.
 
-Available Tools:
-{tool_descs_json}
-
-Respond ONLY with a single valid JSON object with keys "plot_type" (one of {tool_names}) and "parameters" (dict with values for city, country, start_year, end_year, title).
-
-User Request:"""
+{tool_descs_json}"""
 
 # Store system prompt globally after first generation
 _SYSTEM_PROMPT = None
 
-def format_for_sft(sample: Dict[str, str], tokenizer) -> list[str]:
-    """Formats a data sample for SFTTrainer."""
+def format_for_sft_chat(sample: Dict[str, str], tokenizer) -> list[str]:
+    """Formats a data sample for fine-tuning.
+
+    This function takes a sample from the training data and formats it
+    into a chat-based template that the model can understand.
+
+    Args:
+        sample: A dictionary containing the "instruction" and "output"
+            for a single training example.
+        tokenizer: The tokenizer to use for formatting the chat template.
+
+    Returns:
+        A list containing the formatted prompt string.
+    """
     global _SYSTEM_PROMPT
     if _SYSTEM_PROMPT is None:
         _SYSTEM_PROMPT = get_system_prompt()
 
     instruction = sample['instruction']
     output_json = sample['output']
-    # Format: System Prompt + Instruction + Separator + JSON Output + EOS Token
-    text = f"{_SYSTEM_PROMPT}\n{instruction}\n\nJSON Output:\n{output_json}{tokenizer.eos_token}"
-    return [text]
+
+    # Using a structured chat format
+    chat_template = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": instruction},
+        {"role": "assistant", "content": output_json}
+    ]
+
+    # The tokenizer will apply the correct template for the model
+    # (e.g., adding special tokens like <|user|>, <|assistant|>)
+    formatted_prompt = tokenizer.apply_chat_template(chat_template, tokenize=False)
+
+    return [formatted_prompt]
 
 
 # --- Inference Logic ---
 
 def generate_json_response(model, tokenizer, query: str, config: dict) -> Optional[str]:
-    """Generates the JSON response string from the fine-tuned model."""
+    """Generates a JSON response from the fine-tuned model.
+
+    This function takes a user query, formats it into a chat-based
+    prompt, and then uses the fine-tuned model to generate a JSON
+    response that can be used to call a plotting tool.
+
+    Args:
+        model: The fine-tuned language model.
+        tokenizer: The tokenizer for the model.
+        query: The user's natural language query.
+        config: The project configuration dictionary.
+
+    Returns:
+        The JSON response string from the model, or None if an error occurs.
+    """
     global _SYSTEM_PROMPT
     if _SYSTEM_PROMPT is None:
         _SYSTEM_PROMPT = get_system_prompt() # Ensure prompt is generated
 
-    full_prompt = f"{_SYSTEM_PROMPT}\n{query}\n\nJSON Output:\n"
+    # Create the chat structure for inference
+    chat_for_inference = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": query}
+    ]
+
+    # Apply the chat template to format the prompt correctly
+    full_prompt = tokenizer.apply_chat_template(chat_for_inference, tokenize=False, add_generation_prompt=True)
     logger.debug(f"Sending prompt to model:\n{full_prompt[:300]}...")
 
     try:
@@ -242,7 +332,17 @@ def generate_json_response(model, tokenizer, query: str, config: dict) -> Option
         return None
 
 def extract_json_from_text(text: str) -> Optional[str]:
-    """Extracts JSON object from text, prioritizing markdown blocks."""
+    """Extracts a JSON object from a string.
+
+    This function searches for a JSON object within a string,
+    prioritizing JSON enclosed in markdown code blocks.
+
+    Args:
+        text: The string to search for a JSON object.
+
+    Returns:
+        The extracted JSON string, or None if no JSON is found.
+    """
     if not text: return None
     logger.debug(f"Attempting to extract JSON from: {text}")
     # Try markdown block first
@@ -274,7 +374,17 @@ def extract_json_from_text(text: str) -> Optional[str]:
     return None
 
 def parse_json_to_plot_request(json_str: str) -> Optional[PlotRequest]:
-    """Parses JSON string into a validated PlotRequest object."""
+    """Parses a JSON string into a PlotRequest object.
+
+    This function takes a JSON string, validates its structure and
+    content, and then creates a PlotRequest object from it.
+
+    Args:
+        json_str: The JSON string to parse.
+
+    Returns:
+        A PlotRequest object, or None if the JSON is invalid.
+    """
     if not json_str: return None
     try:
         data = json.loads(json_str)

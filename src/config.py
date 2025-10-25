@@ -17,7 +17,18 @@ ADAPTER_DIR = os.path.join(DATA_DIR, "phi2_finetuned_adapter") # Simplified name
 os.makedirs(DATA_DIR, exist_ok=True)
 
 def load_config() -> dict:
-    """Loads the YAML configuration file."""
+    """Loads the YAML configuration file.
+
+    This function reads the `config.yaml` file, processes the paths,
+    and converts the `bnb_4bit_compute_dtype` string to a `torch.dtype` object.
+
+    Returns:
+        A dictionary containing the project configuration.
+
+    Raises:
+        FileNotFoundError: If the configuration file is not found.
+        ValueError: If the torch dtype specified in the config is invalid.
+    """
     if not os.path.exists(CONFIG_PATH):
         logger.error(f"Configuration file not found at: {CONFIG_PATH}")
         raise FileNotFoundError(f"Configuration file not found at: {CONFIG_PATH}")

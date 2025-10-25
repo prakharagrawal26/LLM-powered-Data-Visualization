@@ -26,6 +26,7 @@ from .training import train_model
 
 # --- Basic Logging Setup ---
 def setup_logging():
+    """Configures the logging for the application."""
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     # Ensure data dir exists for log file
     os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -49,6 +50,7 @@ def setup_logging():
 
 # --- Main Execution Logic ---
 def run():
+    """Executes the main fine-tuning and inference pipeline."""
     # Setup logging first
     setup_logging()
     logger = logging.getLogger(__name__) # Get logger after setup
@@ -148,19 +150,19 @@ def run():
         # 1. Get JSON from LLM
         raw_response = generate_json_response(model, tokenizer, query, CONFIG)
         if not raw_response:
-            logger.error("❌ Failed: Model did not generate a response.")
+            logger.error("Failed: Model did not generate a response.")
             continue
 
         # 2. Extract JSON
         json_str = extract_json_from_text(raw_response)
         if not json_str:
-            logger.error(f"❌ Failed: Could not extract JSON from response: {raw_response}")
+            logger.error(f"Failed: Could not extract JSON from response: {raw_response}")
             continue
 
         # 3. Parse JSON to PlotRequest
         plot_request = parse_json_to_plot_request(json_str)
         if not plot_request:
-            logger.error("❌ Failed: Could not parse JSON into a valid PlotRequest.")
+            logger.error("Failed: Could not parse JSON into a valid PlotRequest.")
             continue
 
         # 4. Execute Request (Get data -> Call tool)
@@ -173,13 +175,13 @@ def run():
             )
 
             if yearly_data is None or yearly_data.empty:
-                logger.error(f"❌ Failed: No data found for the request parameters.")
+                logger.error(f"Failed: No data found for the request parameters.")
                 continue # Skip to next query
 
             # Get the plotting tool function
             plot_function = tool_registry.get_tool(plot_request.plot_type.value)
             if plot_function is None:
-                logger.error(f"❌ Failed: Plotting tool '{plot_request.plot_type.value}' not found in registry.")
+                logger.error(f"Failed: Plotting tool '{plot_request.plot_type.value}' not found in registry.")
                 continue
 
             # Prepare title and call the tool
@@ -187,7 +189,7 @@ def run():
             fig = plot_function(yearly_data, plot_title)
 
             if fig:
-                logger.info(f"✅ Success: Plot generated for query {i+1}.")
+                logger.info(f"Success: Plot generated for query {i+1}.")
                 # Save the plot
                 plot_filename = f"plot_query_{i+1}_{plot_request.city.replace(' ','_')}_{plot_request.plot_type.name}.png"
                 plot_save_path = os.path.join(DATA_DIR, plot_filename) # Save in ./data/
@@ -198,10 +200,10 @@ def run():
                     logger.error(f"Failed to save plot {plot_save_path}: {save_e}")
                 plt.close(fig) # Close figure after saving/showing
             else:
-                logger.error(f"❌ Failed: Plotting function did not return a figure for query {i+1}.")
+                logger.error(f"Failed: Plotting function did not return a figure for query {i+1}.")
 
         except Exception as exec_e:
-            logger.error(f"❌ Failed: Unexpected error during request execution: {exec_e}", exc_info=True)
+            logger.error(f"Failed: Unexpected error during request execution: {exec_e}", exc_info=True)
             if fig: plt.close(fig) # Ensure closure on error
 
 

@@ -44,7 +44,7 @@ trainer:
 lora:
   r: 16
   lora_alpha: 32
-  target_modules: ["Wqkv", "out_proj", "fc1", "fc2"] # Adjust if needed
+  target_modules: ["q_proj", "k_proj", "v_proj", "dense", "fc1", "fc2"]
   lora_dropout: 0.05
   bias: "none"
   task_type: "CAUSAL_LM"

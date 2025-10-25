@@ -17,24 +17,32 @@ from .model_handler import (
     get_bitsandbytes_config,
     get_lora_config,
     get_training_args,
-    format_for_sft # Import the formatting function
+    format_for_sft_chat
 )
 
 logger = logging.getLogger(__name__)
 
 # Optional: Callback to free memory during training
 class FreeMemoryCallback(TrainerCallback):
+    """A callback to free up memory at the end of each epoch."""
     def on_epoch_end(self, args, state, control, **kwargs):
+        """Frees up memory at the end of each epoch."""
         logger.info("Epoch end: Clearing CUDA cache.")
         torch.cuda.empty_cache()
         gc.collect()
 
 def train_model(config: Dict[str, Any], training_df: pd.DataFrame) -> bool:
-    """
-    Sets up and runs the SFTTrainer fine-tuning process.
+    """Fine-tunes the language model.
+
+    This function sets up the SFTTrainer and fine-tunes the language
+    model using the provided training data.
+
+    Args:
+        config: The project configuration dictionary.
+        training_df: The DataFrame with the training data.
 
     Returns:
-        True if training was successful and adapter saved, False otherwise.
+        True if training was successful, False otherwise.
     """
     logger.info("--- Starting Model Fine-tuning Process ---")
 
@@ -89,7 +97,7 @@ def train_model(config: Dict[str, Any], training_df: pd.DataFrame) -> bool:
             model=model,
             train_dataset=dataset,
             peft_config=lora_config,
-            formatting_func=partial(format_for_sft, tokenizer=tokenizer), # Use partial correctly
+            formatting_func=partial(format_for_sft_chat, tokenizer=tokenizer), # Use partial correctly
             tokenizer=tokenizer,
             args=training_args,
             max_seq_length=tokenizer.model_max_length or 1024, # Use tokenizer max length or default

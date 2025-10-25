@@ -27,6 +27,7 @@ The core of this project is a Python-based pipeline that performs the following 
 3.  **Download the data**:
     - The project expects the `GlobalLandTemperaturesByCity.csv` file to be present in the `data` directory.
     - If the file is not found, the script will automatically create a smaller, dummy version for testing purposes.
+    - You can download this dataset from kaggle via this link - [dataset](https://www.kaggle.com/datasets/berkeleyearth/climate-change-earth-surface-temperature-data)
 
 ## Usage
 
